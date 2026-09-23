@@ -34,6 +34,8 @@ body { min-height: 100dvh; overflow-x: clip; }
 
 .hidden { display: none !important; }
 
+:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 2px; }
+
 /* ══════════════════════════════════════
    SETUP SCREEN
    ══════════════════════════════════════ */
@@ -112,7 +114,7 @@ body { min-height: 100dvh; overflow-x: clip; }
   text-align: center;
   font-family: inherit;
 }
-.chip-table input:focus { outline: none; border-color: var(--gold-dim); }
+.chip-table input:focus-visible { border-color: var(--gold-dim); }
 
 .stack-total {
   text-align: right;
@@ -146,7 +148,7 @@ body { min-height: 100dvh; overflow-x: clip; }
   padding: 7px 8px;
   font-family: inherit;
 }
-.form-group input:focus, .form-group select:focus { outline: none; border-color: var(--gold-dim); }
+.form-group input:focus-visible, .form-group select:focus-visible { border-color: var(--gold-dim); }
 
 .player-inputs { display: flex; flex-direction: column; gap: 6px; }
 .player-row { display: flex; gap: 6px; align-items: center; }
@@ -673,6 +675,9 @@ body { min-height: 100dvh; overflow-x: clip; }
   cursor: pointer;
 }
 .dealer-line:hover { color: var(--gold-bright); }
+/* the line is tappable: it advances the dealer. Keep a persistent affordance
+   on screen, not just a cursor change on hover */
+.dealer-line::after { content: ' \25B8'; margin-left: 8px; color: var(--gold-dim); font-size: 0.7em; vertical-align: middle; }
 
 .clock-active-count {
   font-size: 13px;
@@ -1000,7 +1005,7 @@ body { min-height: 100dvh; overflow-x: clip; }
         <button class="time-btn" id="sub-time-btn">-1 MIN</button>
         <button class="time-btn" id="add-time-btn">+1 MIN</button>
       </div>
-      <div class="dealer-line" id="dealer-name"></div>
+      <div class="dealer-line" id="dealer-name" title="Tap to advance the dealer one seat"></div>
       <div class="clock-active-count" id="clock-active-count"></div>
       <div class="t-controls">
         <button class="ctrl-btn primary" id="pause-btn">Pause</button>
