@@ -95,9 +95,9 @@ const poker = global.window.__poker;
 /* ── State factory ── */
 function baseState(overrides) {
   const players = (overrides && overrides.players) || [
-    { name: 'P1', active: true, rebuys: 0 },
-    { name: 'P2', active: true, rebuys: 0 },
-    { name: 'P3', active: true, rebuys: 0 },
+    { name: 'P1', active: true, rebuys: 0, paid: true },
+    { name: 'P2', active: true, rebuys: 0, paid: true },
+    { name: 'P3', active: true, rebuys: 0, paid: true },
   ];
   return Object.assign({
     phase: 'paused',
@@ -252,10 +252,12 @@ test('renderPlayers renders hostile names inert', () => {
 /* ── Saved blob sanitisation ── */
 test('sanitizeState accepts a well formed save', () => {
   const saved = baseState();
+  delete saved.players[0].paid; // legacy save from before the ledger
   const out = poker.fn.sanitizeState(JSON.parse(JSON.stringify(saved)));
   assert(out, 'valid blob survives');
   assertEq(out.currentLevel, 0);
   assertEq(out.seatOrder.length, 3);
+  assertEq(out.players[0].paid, true, 'legacy player defaults to paid');
 });
 test('sanitizeState keeps a valid seat permutation', () => {
   const s = baseState();
@@ -468,6 +470,46 @@ test('validation catches a paid place beyond the roster', () => {
   tail.players = [{ name: 'A', active: true, rebuys: 0 }, { name: 'B', active: true, rebuys: 0 }];
   tail.payout = [60, 40, 0];
   assertEq(poker.fn.validateConfig(tail), null, 'zero third place is fine');
+});
+
+/* ── Paid ledger ── */
+test('unpaid buy-ins come out of the pool and show as outstanding', () => {
+  const s = baseState();
+  s.players[2].paid = false;
+  poker.state = s;
+  poker.fn.renderPrizePool();
+  assertEq(elements['prize-total'].textContent, 'R' + (2 * 300).toLocaleString(), 'pool counts collected only');
+  assert(/Outstanding R300/.test(elements['prize-breakdown'].innerHTML), 'outstanding total shown');
+  assert(/P3/.test(elements['prize-breakdown'].innerHTML), 'unpaid player named');
+});
+test('everyone paid means no outstanding line', () => {
+  poker.state = baseState();
+  poker.fn.renderPrizePool();
+  assert(!/Outstanding/.test(elements['prize-breakdown'].innerHTML), 'no outstanding line');
+});
+test('markPlayerPaid settles a player after confirm', () => {
+  poker.state = baseState();
+  poker.state.players[0].paid = false;
+  poker.fn.markPlayerPaid(0);
+  assert(poker.state.players[0].paid, 'paid after confirm');
+  poker.fn.renderPrizePool();
+  assert(!/Outstanding/.test(elements['prize-breakdown'].innerHTML), 'outstanding cleared');
+});
+test('rebuyPlayer records the re-buy as paid', () => {
+  poker.state = baseState();
+  poker.state.players[1].active = false;
+  poker.fn.rebuyPlayer(1);
+  assert(poker.state.players[1].paid, 're-buy marks paid');
+});
+test('unpaid players carry an Owes badge and a Paid action', () => {
+  const s = baseState();
+  s.players[0].paid = false;
+  poker.state = s;
+  poker.fn.renderPlayers();
+  const html = elements['player-list'].innerHTML;
+  assert(/unpaid-badge/.test(html), 'badge rendered');
+  assert(/data-action="pay"/.test(html), 'pay action rendered');
+  assert(!/onclick=/.test(html), 'still no inline handlers');
 });
 
 /* ── Win alert (async via setTimeout) ── */

@@ -152,6 +152,17 @@ body { min-height: 100dvh; overflow-x: hidden; }
 .player-inputs { display: flex; flex-direction: column; gap: 6px; }
 .player-row { display: flex; gap: 6px; align-items: center; }
 .player-row input { flex: 1; }
+.player-row .paid-btn {
+  width: 28px; height: 28px;
+  background: none; border: 1px solid var(--border);
+  border-radius: 5px; cursor: pointer;
+  font-size: 14px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; font-family: inherit; padding: 0;
+}
+.player-row .paid-btn.paid-yes { color: var(--chip-green); border-color: var(--chip-green); }
+.player-row .paid-btn.paid-no { color: var(--danger); }
+.player-row .paid-btn:hover { border-color: var(--gold-dim); }
 .player-row .remove-btn {
   width: 28px; height: 28px;
   background: none; border: 1px solid var(--border);
@@ -423,6 +434,27 @@ body { min-height: 100dvh; overflow-x: hidden; }
   font-weight: 600;
 }
 .action-icon.rebuy-btn:hover { background: rgba(201,168,76,0.15); }
+.action-icon.pay-btn {
+  background: transparent;
+  border: 1px solid var(--chip-green);
+  color: var(--chip-green);
+  width: auto;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.action-icon.pay-btn:hover { background: rgba(45,158,45,0.15); }
+
+.unpaid-badge {
+  background: none;
+  border: 1px solid var(--danger);
+  color: var(--danger-glow);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
 
 
 /* ── Column 1: Info (Chips, Prize Pool) ── */
@@ -483,6 +515,13 @@ body { min-height: 100dvh; overflow-x: hidden; }
 .prize-place { font-size: 14px; color: var(--text-secondary); }
 .prize-place strong { color: var(--text); font-weight: 500; }
 .prize-place .place-icon { margin-right: 4px; font-size: 16px; }
+.prize-outstanding {
+  font-size: 12px;
+  color: var(--danger-glow);
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+  padding-top: 8px;
+}
 
 .t-controls {
   position: absolute;
@@ -1119,7 +1158,7 @@ function buildSetupForm() {
   $('add-player-btn').onclick = () => addPlayerInput('');
 }
 
-function addPlayerInput(name) {
+function addPlayerInput(name, paid) {
   const inputs = $('player-inputs');
   const row = document.createElement('div');
   row.className = 'player-row';
@@ -1127,6 +1166,24 @@ function addPlayerInput(name) {
   input.type = 'text';
   input.placeholder = 'Name';
   input.value = name;
+  // buy-in ledger toggle: green tick once the cash has landed
+  const paidBtn = document.createElement('button');
+  paidBtn.type = 'button';
+  paidBtn.className = 'paid-btn';
+  paidBtn.title = 'Buy-in paid';
+  const paintPaid = () => {
+    const isPaid = paidBtn.dataset.paid === '1';
+    paidBtn.dataset.paid = isPaid ? '1' : '0';
+    paidBtn.textContent = isPaid ? '\u2713' : '\u2717';
+    paidBtn.classList.toggle('paid-yes', isPaid);
+    paidBtn.classList.toggle('paid-no', !isPaid);
+  };
+  paidBtn.dataset.paid = paid ? '1' : '0';
+  paintPaid();
+  paidBtn.onclick = () => {
+    paidBtn.dataset.paid = paidBtn.dataset.paid === '1' ? '0' : '1';
+    paintPaid();
+  };
   const removeBtn = document.createElement('button');
   removeBtn.className = 'remove-btn';
   removeBtn.title = 'Remove';
@@ -1135,6 +1192,7 @@ function addPlayerInput(name) {
     if (inputs.children.length > 2) row.remove();
   };
   row.appendChild(input);
+  row.appendChild(paidBtn);
   row.appendChild(removeBtn);
   inputs.appendChild(row);
 }
@@ -1165,9 +1223,17 @@ function readConfig() {
     start: parseIntField($(`chip-start-${c.id}`), 0),
     rebuy: parseIntField($(`chip-rebuy-${c.id}`), 0),
   }));
-  const playerEls = $('player-inputs').querySelectorAll('input');
-  const players = Array.from(playerEls)
-    .map((el, i) => ({ name: el.value.trim() || `Player ${i+1}`, active: true, rebuys: 0 }));
+  const playerRows = $('player-inputs').querySelectorAll('.player-row');
+  const players = Array.from(playerRows).map((row, i) => {
+    const input = row.querySelector('input');
+    const paidBtn = row.querySelector('.paid-btn');
+    return {
+      name: (input && input.value.trim()) || `Player ${i + 1}`,
+      active: true,
+      rebuys: 0,
+      paid: paidBtn ? paidBtn.dataset.paid === '1' : true,
+    };
+  });
 
   return {
     chips, players,
@@ -1256,6 +1322,8 @@ function sanitizeState(saved) {
       name: p.name,
       active: !!p.active,
       rebuys: Number.isInteger(p.rebuys) && p.rebuys >= 0 && p.rebuys <= 99 ? p.rebuys : 0,
+      // saves from before the paid ledger assumed everyone had paid
+      paid: typeof p.paid === 'boolean' ? p.paid : true,
     };
   });
   if (s.players.some(p => p === null)) return null;
@@ -1554,6 +1622,7 @@ function renderPlayers() {
     if (isDlr) badges += '<span class="pos-label dealer">D</span>';
     if (isSB) badges += '<span class="pos-label sb">SB</span>';
     if (isBB) badges += '<span class="pos-label bb">BB</span>';
+    if (!p.paid) badges += '<span class="unpaid-badge">Owes</span>';
 
     const rebuyBadge = p.rebuys > 0 ? `<span class="rebuy-badge">R${p.rebuys > 1 ? p.rebuys : ''}</span>` : '';
 
@@ -1563,6 +1632,7 @@ function renderPlayers() {
       actions = `
         <button class="action-icon" data-action="up" data-seat="${seatIdx}" title="Move up">\u25B2</button>
         <button class="action-icon" data-action="down" data-seat="${seatIdx}" title="Move down">\u25BC</button>
+        ${!p.paid ? `<button class="action-icon pay-btn" data-action="pay" data-player="${playerIdx}" title="Mark buy-in paid">Paid</button>` : ''}
         ${activePlayers > 1 ? `<button class="action-icon elim-btn" data-action="elim" data-player="${playerIdx}" title="Eliminate">\u2715</button>` : ''}
       `;
     } else {
@@ -1595,15 +1665,26 @@ function computePrizes(pool, payout) {
   return amounts;
 }
 
+/* The pool is the cash actually collected: paid buy-ins plus re-buys, which
+   always land at the moment they are recorded. Unpaid buy-ins are listed as
+   outstanding so the night can settle who still owes what. */
 function renderPrizePool() {
-  const pool = state.players.length * state.config.buyin + state.totalRebuys * state.config.rebuyAmount;
+  const unpaid = state.players.filter(p => !p.paid);
+  const pool = (state.players.length - unpaid.length) * state.config.buyin
+    + state.totalRebuys * state.config.rebuyAmount;
   $('prize-total').textContent = `R${pool.toLocaleString()}`;
   const icons = ['\u{1F947}', '\u{1F948}', '\u{1F949}'];
   const places = Math.min(state.config.payout.length, state.players.length);
-  $('prize-breakdown').innerHTML = computePrizes(pool, state.config.payout)
+  let html = computePrizes(pool, state.config.payout)
     .slice(0, places)
     .map((amt, i) => `<div class="prize-place"><span class="place-icon">${icons[i]}</span> <strong>R${amt.toLocaleString()}</strong> (${state.config.payout[i]}%)</div>`)
     .join('');
+  if (unpaid.length > 0) {
+    const owed = unpaid.length * state.config.buyin;
+    const names = unpaid.map(p => escapeHtml(p.name)).join(', ');
+    html += `<div class="prize-outstanding">Outstanding R${owed.toLocaleString()}: ${names}</div>`;
+  }
+  $('prize-breakdown').innerHTML = html;
 }
 
 function renderHandRankings() {
@@ -1663,7 +1744,17 @@ function eliminatePlayer(idx) {
 function rebuyPlayer(idx) {
   state.players[idx].active = true;
   state.players[idx].rebuys++;
+  state.players[idx].paid = true; // the re-buy cash lands as it is recorded
   state.totalRebuys++;
+  saveState();
+  renderTournament();
+}
+
+function markPlayerPaid(idx) {
+  const p = state.players[idx];
+  if (!p || p.paid) return;
+  if (!confirm(`Mark ${p.name} paid the R${state.config.buyin} buy-in?`)) return;
+  p.paid = true;
   saveState();
   renderTournament();
 }
@@ -1774,6 +1865,7 @@ $('player-list').addEventListener('click', (e) => {
   const action = btn.dataset.action;
   if (action === 'elim') eliminatePlayer(parseInt(btn.dataset.player, 10));
   else if (action === 'rebuy') rebuyPlayer(parseInt(btn.dataset.player, 10));
+  else if (action === 'pay') markPlayerPaid(parseInt(btn.dataset.player, 10));
   else if (action === 'up') movePlayerUp(parseInt(btn.dataset.seat, 10));
   else if (action === 'down') movePlayerDown(parseInt(btn.dataset.seat, 10));
 });
@@ -1825,8 +1917,8 @@ if (typeof window !== 'undefined') {
     get state() { return state; },
     set state(s) { state = s; },
     fn: { tick, reconcileTime, validateConfig, renderTournament, renderPrizePool, renderPlayers,
-          eliminatePlayer, rebuyPlayer, checkResume, formatTime, formatChips, getNextActiveSeat,
-          escapeHtml, sanitizeState, saveState, parseIntField, readConfig,
+          eliminatePlayer, rebuyPlayer, markPlayerPaid, checkResume, formatTime, formatChips,
+          getNextActiveSeat, escapeHtml, sanitizeState, saveState, parseIntField, readConfig,
           playingLevelNumber, totalPlayingLevels, computePrizes },
   };
 }
