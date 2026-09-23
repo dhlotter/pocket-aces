@@ -193,7 +193,8 @@ body { min-height: 100dvh; overflow-x: clip; }
 .add-player-btn:hover { border-color: var(--gold-dim); color: var(--gold-dim); }
 
 .payout-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
-.payout-row span { min-width: 28px; font-size: 18px; text-align: center; }
+.payout-row span { min-width: 28px; text-align: center; }
+.place-badge { font-size: 12px; font-weight: 700; color: var(--gold); letter-spacing: 0.5px; }
 .payout-row input { width: 60px; }
 .payout-row .payout-label { font-size: 12px; color: var(--text-secondary); min-width: 20px; }
 
@@ -520,7 +521,7 @@ body { min-height: 100dvh; overflow-x: clip; }
 }
 .prize-place { font-size: 14px; color: var(--text-secondary); }
 .prize-place strong { color: var(--text); font-weight: 500; }
-.prize-place .place-icon { margin-right: 4px; font-size: 16px; }
+.prize-place .place-badge { margin-right: 4px; }
 .prize-outstanding {
   font-size: 12px;
   color: var(--danger-glow);
@@ -940,17 +941,17 @@ body { min-height: 100dvh; overflow-x: clip; }
     <div class="section">
       <div class="section-title">Payout</div>
       <div class="payout-row">
-        <span aria-hidden="true">&#x1F947;</span>
+        <span class="place-badge">1st</span>
         <div class="form-group"><input type="number" id="cfg-payout-1" aria-label="First place payout percent" value="60" min="0" max="100"></div>
         <div class="payout-label">%</div>
       </div>
       <div class="payout-row">
-        <span aria-hidden="true">&#x1F948;</span>
+        <span class="place-badge">2nd</span>
         <div class="form-group"><input type="number" id="cfg-payout-2" aria-label="Second place payout percent" value="30" min="0" max="100"></div>
         <div class="payout-label">%</div>
       </div>
       <div class="payout-row">
-        <span aria-hidden="true">&#x1F949;</span>
+        <span class="place-badge">3rd</span>
         <div class="form-group"><input type="number" id="cfg-payout-3" aria-label="Third place payout percent" value="10" min="0" max="100"></div>
         <div class="payout-label">%</div>
       </div>
@@ -1689,11 +1690,11 @@ function renderPrizePool() {
   const pool = (state.players.length - unpaid.length) * state.config.buyin
     + state.totalRebuys * state.config.rebuyAmount;
   $('prize-total').textContent = `R${pool.toLocaleString()}`;
-  const icons = ['\u{1F947}', '\u{1F948}', '\u{1F949}'];
+  const placeLabels = ['1st', '2nd', '3rd'];
   const places = Math.min(state.config.payout.length, state.players.length);
   let html = computePrizes(pool, state.config.payout)
     .slice(0, places)
-    .map((amt, i) => `<div class="prize-place"><span class="place-icon">${icons[i]}</span> <strong>R${amt.toLocaleString()}</strong> (${state.config.payout[i]}%)</div>`)
+    .map((amt, i) => `<div class="prize-place"><span class="place-badge">${placeLabels[i]}</span> <strong>R${amt.toLocaleString()}</strong> (${state.config.payout[i]}%)</div>`)
     .join('');
   if (unpaid.length > 0) {
     const owed = unpaid.length * state.config.buyin;
