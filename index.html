@@ -85,6 +85,20 @@ body { min-height: 100dvh; overflow-x: clip; }
   padding-bottom: 4px;
   border-bottom: 1px solid var(--border);
 }
+.players-title { display: flex; justify-content: space-between; align-items: center; }
+.all-paid-btn {
+  background: none;
+  border: 1px solid var(--chip-green);
+  border-radius: 5px;
+  color: var(--chip-green);
+  font-size: 11px;
+  font-weight: 700;
+  font-family: 'DM Sans', sans-serif;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+.all-paid-btn:hover { background: rgba(45,158,45,0.15); }
 
 .chip-table { width: 100%; border-collapse: collapse; }
 .chip-table th {
@@ -158,12 +172,13 @@ body { min-height: 100dvh; overflow-x: clip; }
 .player-row { display: flex; gap: 6px; align-items: center; }
 .player-row input { flex: 1; }
 .player-row .paid-btn {
-  width: 28px; height: 28px;
+  height: 28px;
   background: none; border: 1px solid var(--border);
   border-radius: 5px; cursor: pointer;
-  font-size: 14px; line-height: 1;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+  line-height: 1;
   display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; font-family: inherit; padding: 0;
+  flex-shrink: 0; font-family: inherit; padding: 0 10px;
 }
 .player-row .paid-btn.paid-yes { color: var(--chip-green); border-color: var(--chip-green); }
 .player-row .paid-btn.paid-no { color: var(--danger); }
@@ -958,7 +973,7 @@ body { min-height: 100dvh; overflow-x: clip; }
     </div>
 
     <div class="section">
-      <div class="section-title">Players</div>
+      <div class="section-title players-title"><span>Players</span><button type="button" id="all-paid-btn" class="all-paid-btn" title="Mark every player's buy-in as paid">All paid &#10003;</button></div>
       <div class="player-inputs" id="player-inputs"></div>
       <button class="add-player-btn" id="add-player-btn">+ Add Player</button>
     </div>
@@ -1171,6 +1186,11 @@ function buildSetupForm() {
   inputs.innerHTML = '';
   defaultNames.forEach(name => addPlayerInput(name));
   $('add-player-btn').onclick = () => addPlayerInput('');
+  $('all-paid-btn').onclick = () => {
+    document.querySelectorAll('#player-inputs .paid-btn').forEach(b => {
+      if (b.dataset.paid !== '1') b.click();
+    });
+  };
 }
 
 function addPlayerInput(name, paid) {
@@ -1182,7 +1202,7 @@ function addPlayerInput(name, paid) {
   input.placeholder = 'Name';
   input.value = name;
   input.setAttribute('aria-label', 'Player name');
-  // buy-in ledger toggle: green tick once the cash has landed
+  // buy-in ledger toggle: everyone owes at the desk, flip to Paid as cash lands
   const paidBtn = document.createElement('button');
   paidBtn.type = 'button';
   paidBtn.className = 'paid-btn';
@@ -1190,8 +1210,7 @@ function addPlayerInput(name, paid) {
   const paintPaid = () => {
     const isPaid = paidBtn.dataset.paid === '1';
     paidBtn.dataset.paid = isPaid ? '1' : '0';
-    // hollow circle owes, tick paid, so the toggle never looks like the remove cross
-    paidBtn.textContent = isPaid ? '\u2713' : '\u25CB';
+    paidBtn.textContent = isPaid ? 'Paid' : 'Owes';
     paidBtn.classList.toggle('paid-yes', isPaid);
     paidBtn.classList.toggle('paid-no', !isPaid);
   };
@@ -1416,6 +1435,9 @@ function startTournament() {
   const cfg = readConfig();
   const err = validateConfig(cfg);
   if (err) { alert(err); return; }
+  // setup is the registration desk: name anyone short of cash before the cards go in the air
+  const unpaid = cfg.players.filter(p => !p.paid).length;
+  if (unpaid > 0 && !confirm(`${unpaid} of ${cfg.players.length} haven't paid their buy-in yet. Start anyway?`)) return;
   ensureAudio();
   state = createState(cfg);
   saveState();
