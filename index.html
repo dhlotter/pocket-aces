@@ -1280,16 +1280,6 @@ function endTournament() {
   showSetup();
 }
 
-function advanceLevel() {
-  if (!state || state.currentLevel >= BLIND_STRUCTURE.length - 1) return;
-  state.currentLevel++;
-  state.timeRemaining = BLIND_STRUCTURE[state.currentLevel].duration;
-  state.lastTick = Date.now();
-  playGong();
-  saveState();
-  renderTournament();
-}
-
 /* ── Direction & Seat Helpers ── */
 function getNextActiveSeat(fromSeat) {
   const n = state.seatOrder.length;
