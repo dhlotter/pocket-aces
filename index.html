@@ -348,6 +348,7 @@ body { min-height: 100dvh; overflow-x: hidden; }
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
   transition: all 0.15s;
   border-radius: 8px;
 }
@@ -845,12 +846,12 @@ body { min-height: 100dvh; overflow-x: hidden; }
 /* ── Responsive ── */
 @media (max-width: 1400px) {
   .tournament-grid {
-    grid-template-columns: 320px 240px 1fr 280px;
+    grid-template-columns: 320px 280px 1fr 280px;
   }
 }
 @media (max-width: 1200px) {
   .tournament-grid {
-    grid-template-columns: 280px 220px 1fr 240px;
+    grid-template-columns: 280px 260px 1fr 240px;
   }
 }
 @media (max-width: 900px) {
