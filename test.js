@@ -353,7 +353,7 @@ test('validateConfig rejects negatives and too few players for paid places', () 
   assert(/100%/.test(poker.fn.validateConfig(cfg3)), 'sum 90 still caught');
   const cfg4 = good();
   cfg4.players = [{ name: 'A', active: true, rebuys: 0 }, { name: 'B', active: true, rebuys: 0 }];
-  assert(/prize places/.test(poker.fn.validateConfig(cfg4)), '2 players cannot fill 3 paid places');
+  assert(/need at least 3/.test(poker.fn.validateConfig(cfg4)), '2 players cannot fill 3 paid places');
   const cfg5 = good();
   cfg5.maxRebuys = 0;
   assertEq(poker.fn.validateConfig(cfg5), null, 'zero max rebuys is valid');
@@ -430,6 +430,44 @@ test('playingLevelNumber counts only real levels', () => {
   assertEq(f(4), 4, 'break adds nothing');
   assertEq(f(5), 5);
   assertEq(poker.fn.totalPlayingLevels(), 14);
+});
+
+/* ── Prize math ── */
+test('computePrizes sums exactly to the pool with remainder to first', () => {
+  const f = poker.fn.computePrizes;
+  assertEq(f(1499, [50, 30, 20]).join(','), '749,450,300', 'rounding overrun lands on first');
+  assertEq(f(1001, [60, 30, 10]).join(','), '601,300,100', 'rounding underrun lands on first');
+  for (const pool of [0, 7, 997, 1500, 12345]) {
+    for (const split of [[60, 30, 10], [50, 30, 20], [100, 0, 0], [34, 33, 33]]) {
+      const amt = f(pool, split);
+      assertEq(amt.reduce((a, b) => a + b, 0), pool, `split of ${pool} with ${split}`);
+    }
+  }
+});
+test('prize breakdown caps places at the player count', () => {
+  poker.state = baseState({ players: [{ name: 'A', active: true, rebuys: 0 }, { name: 'B', active: true, rebuys: 0 }] });
+  poker.fn.renderPrizePool();
+  const rows2 = (elements['prize-breakdown'].innerHTML.match(/prize-place/g) || []).length;
+  assertEq(rows2, 2, 'no third place row for two players');
+  poker.state = baseState();
+  poker.fn.renderPrizePool();
+  const rows3 = (elements['prize-breakdown'].innerHTML.match(/prize-place/g) || []).length;
+  assertEq(rows3, 3, 'three rows for three players');
+});
+test('validation catches a paid place beyond the roster', () => {
+  const good = () => {
+    const s = baseState();
+    s.config.players = s.players;
+    return s.config;
+  };
+  const sparse = good();
+  sparse.players = [{ name: 'A', active: true, rebuys: 0 }, { name: 'B', active: true, rebuys: 0 }];
+  sparse.payout = [0, 50, 50];
+  assert(/need at least 3/.test(poker.fn.validateConfig(sparse)), 'place 3 pays with 2 players');
+  const tail = good();
+  tail.players = [{ name: 'A', active: true, rebuys: 0 }, { name: 'B', active: true, rebuys: 0 }];
+  tail.payout = [60, 40, 0];
+  assertEq(poker.fn.validateConfig(tail), null, 'zero third place is fine');
 });
 
 /* ── Win alert (async via setTimeout) ── */

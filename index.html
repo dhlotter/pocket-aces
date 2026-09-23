@@ -1193,8 +1193,10 @@ function validateConfig(cfg) {
   if (cfg.payout.some(p => p > 100)) return 'Each payout place must be 100% or less';
   const payoutSum = cfg.payout.reduce((a,b) => a+b, 0);
   if (payoutSum !== 100) return `Payout must total 100% (currently ${payoutSum}%)`;
-  const paidPlaces = cfg.payout.filter(p => p > 0).length;
-  if (cfg.players.length < paidPlaces) return `${paidPlaces} prize places pay out, need at least ${paidPlaces} players`;
+  const lastPaidPlace = cfg.payout.reduce((last, p, i) => (p > 0 ? i : last), -1);
+  if (lastPaidPlace !== -1 && cfg.players.length < lastPaidPlace + 1) {
+    return `Place ${lastPaidPlace + 1} pays out, need at least ${lastPaidPlace + 1} players`;
+  }
   const numPlayers = cfg.players.length;
   for (const c of cfg.chips) {
     const needed = c.start * numPlayers;
@@ -1584,14 +1586,24 @@ function renderPlayers() {
     : `Dealer: ${dlrPlayer.name} (eliminated)`;
 }
 
+/* Splits the pool by payout percentage, rounding each place and giving the
+   rounding remainder to first so the places always sum to the pool exactly. */
+function computePrizes(pool, payout) {
+  const amounts = payout.map(pct => Math.round(pool * pct / 100));
+  const remainder = pool - amounts.reduce((a, b) => a + b, 0);
+  amounts[0] += remainder;
+  return amounts;
+}
+
 function renderPrizePool() {
   const pool = state.players.length * state.config.buyin + state.totalRebuys * state.config.rebuyAmount;
   $('prize-total').textContent = `R${pool.toLocaleString()}`;
   const icons = ['\u{1F947}', '\u{1F948}', '\u{1F949}'];
-  $('prize-breakdown').innerHTML = state.config.payout.map((pct, i) => {
-    const amt = Math.round(pool * pct / 100);
-    return `<div class="prize-place"><span class="place-icon">${icons[i]}</span> <strong>R${amt.toLocaleString()}</strong> (${pct}%)</div>`;
-  }).join('');
+  const places = Math.min(state.config.payout.length, state.players.length);
+  $('prize-breakdown').innerHTML = computePrizes(pool, state.config.payout)
+    .slice(0, places)
+    .map((amt, i) => `<div class="prize-place"><span class="place-icon">${icons[i]}</span> <strong>R${amt.toLocaleString()}</strong> (${state.config.payout[i]}%)</div>`)
+    .join('');
 }
 
 function renderHandRankings() {
@@ -1815,7 +1827,7 @@ if (typeof window !== 'undefined') {
     fn: { tick, reconcileTime, validateConfig, renderTournament, renderPrizePool, renderPlayers,
           eliminatePlayer, rebuyPlayer, checkResume, formatTime, formatChips, getNextActiveSeat,
           escapeHtml, sanitizeState, saveState, parseIntField, readConfig,
-          playingLevelNumber, totalPlayingLevels },
+          playingLevelNumber, totalPlayingLevels, computePrizes },
   };
 }
 
