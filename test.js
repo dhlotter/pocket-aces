@@ -63,7 +63,10 @@ global.document = {
   activeElement: null,
   body: makeEl('body'),
 };
-global.window = { AudioContext: function () { return audioStub(); } };
+global.window = {
+  AudioContext: function () { return audioStub(); },
+  addEventListener() {},
+};
 global.localStorage = {
   getItem: k => (k in store ? store[k] : null),
   setItem: (k, v) => { store[k] = String(v); },
@@ -245,6 +248,68 @@ test('renderPlayers renders hostile names inert', () => {
   const html = elements['player-list'].innerHTML;
   assert(!html.includes('<img'), 'no raw img tag in player list');
   assert(html.includes('&lt;img'), 'name present but escaped');
+});
+
+/* ── Saved blob sanitisation ── */
+test('sanitizeState accepts a well formed save', () => {
+  const saved = baseState();
+  const out = poker.fn.sanitizeState(JSON.parse(JSON.stringify(saved)));
+  assert(out, 'valid blob survives');
+  assertEq(out.currentLevel, 0);
+  assertEq(out.seatOrder.length, 3);
+});
+test('sanitizeState keeps a valid seat permutation', () => {
+  const s = baseState();
+  s.seatOrder = [2, 0, 1];
+  const out = poker.fn.sanitizeState(s);
+  assertEq(out.seatOrder.join(','), '2,0,1');
+});
+test('sanitizeState rejects a hostile or corrupt shape', () => {
+  const bad = mut => { const s = baseState(); mut(s); return poker.fn.sanitizeState(s); };
+  assert(!bad(s => { s.phase = 'exploded'; }), 'bad phase');
+  assert(!bad(s => { s.currentLevel = 99; }), 'out of range level');
+  assert(!bad(s => { s.currentLevel = '0'; }), 'string level');
+  assert(!bad(s => { s.players = 'all'; }), 'players not an array');
+  assert(!bad(s => { s.players[0] = null; }), 'null player');
+  assert(!bad(s => { s.players[0].name = 42; }), 'numeric name');
+  assert(!bad(s => { s.config.payout = [60, 60, -20]; }), 'negative payout summing to 100');
+  assert(!bad(s => { s.config.payout = [50, 30, 10]; }), 'payout summing to 90');
+  assert(!bad(s => { s.config.buyin = 'free'; }), 'string buyin');
+  assert(!bad(s => { s.lastTick = 'yesterday'; }), 'bad lastTick');
+  assert(!bad(s => { s.timeRemaining = NaN; }), 'NaN time');
+});
+test('sanitizeState whitelists chip identity and rebuilds a broken seatOrder', () => {
+  const s = baseState();
+  s.config.chips[0].css = 'javascript:alert(1)';
+  s.config.chips[0].label = '<b>x</b>';
+  s.config.chips[0].count = -50;
+  s.seatOrder = [2, 0];
+  const out = poker.fn.sanitizeState(s);
+  assertEq(out.config.chips[0].css, 'var(--chip-white)', 'css from whitelist');
+  assertEq(out.config.chips[0].label, 'White', 'label from whitelist');
+  assertEq(out.config.chips[0].count, 100, 'negative count reset to default');
+  assertEq(out.seatOrder.join(','), '0,1,2', 'seatOrder rebuilt');
+});
+
+/* ── Corruption and save-failure handling ── */
+test('corrupt save is cleared with a note, not thrown on', () => {
+  store['poker-tournament-v1'] = '{not json';
+  poker.fn.checkResume();
+  assert(/corrupt/i.test(elements['resume-area'].innerHTML), 'note shown for unparseable json');
+  assertEq(store['poker-tournament-v1'], undefined, 'key cleared');
+  store['poker-tournament-v1'] = JSON.stringify({ phase: 'running', currentLevel: 999 });
+  poker.fn.checkResume();
+  assert(/corrupt/i.test(elements['resume-area'].innerHTML), 'shape failure treated as corrupt');
+  assertEq(store['poker-tournament-v1'], undefined, 'cleared again');
+});
+test('save failure surfaces a warning', () => {
+  poker.state = baseState();
+  const original = global.localStorage.setItem;
+  global.localStorage.setItem = () => { throw new Error('QuotaExceeded'); };
+  poker.fn.saveState();
+  global.localStorage.setItem = original;
+  assert(!elements['storage-warning'].classList.contains('hidden'), 'warning visible');
+  assert(/Could not save/.test(elements['storage-warning'].textContent), 'warning explains');
 });
 
 /* ── Win alert (async via setTimeout) ── */

@@ -219,6 +219,23 @@ body { min-height: 100dvh; overflow-x: hidden; }
 .resume-btn { background: var(--green-felt); color: var(--text); border-color: var(--green-felt) !important; }
 .discard-btn { background: none; color: var(--text-secondary); }
 
+.storage-warning {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 300;
+  background: #3a1515;
+  border: 1px solid var(--danger);
+  color: #ffd7d7;
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  max-width: 90vw;
+}
+.storage-note { text-align: center; color: var(--text-secondary); font-size: 13px; margin-bottom: 16px; }
+
 @media (max-width: 700px) {
   .setup-grid {
     grid-template-columns: 1fr;
@@ -803,6 +820,8 @@ body { min-height: 100dvh; overflow-x: hidden; }
 </head>
 <body>
 
+<div id="storage-warning" class="storage-warning hidden" title="Dismiss"></div>
+
 <!-- ════════ SETUP SCREEN ════════ -->
 <div id="setup">
   <div class="setup-header">
@@ -1176,19 +1195,91 @@ function createState(cfg) {
 function saveState() {
   if (!state) return;
   state.lastTick = Date.now();
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  catch(e) {
+    showStorageWarning('Could not save progress: storage full or blocked. A refresh will lose the game.');
+  }
 }
 
 function loadSavedState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw);
+    return sanitizeState(JSON.parse(raw));
   } catch(e) { return null; }
+}
+
+/* Type checks a parsed blob from localStorage. Returns a clean state, or null
+   when any field is the wrong shape: a corrupt save must never reach a render. */
+function sanitizeState(saved) {
+  if (!saved || typeof saved !== 'object') return null;
+  const s = {};
+  if (saved.phase !== 'running' && saved.phase !== 'paused' && saved.phase !== 'finished') return null;
+  s.phase = saved.phase;
+  if (!Number.isInteger(saved.currentLevel) || saved.currentLevel < 0 || saved.currentLevel >= BLIND_STRUCTURE.length) return null;
+  s.currentLevel = saved.currentLevel;
+  if (typeof saved.timeRemaining !== 'number' || !isFinite(saved.timeRemaining)) return null;
+  s.timeRemaining = Math.max(0, Math.floor(saved.timeRemaining));
+  if (!Array.isArray(saved.players) || saved.players.length < 1 || saved.players.length > 20) return null;
+  s.players = saved.players.map(p => {
+    if (!p || typeof p !== 'object' || typeof p.name !== 'string' || p.name.length > 40) return null;
+    return {
+      name: p.name,
+      active: !!p.active,
+      rebuys: Number.isInteger(p.rebuys) && p.rebuys >= 0 && p.rebuys <= 99 ? p.rebuys : 0,
+    };
+  });
+  if (s.players.some(p => p === null)) return null;
+  const c = saved.config;
+  if (!c || typeof c !== 'object') return null;
+  if (!Number.isInteger(c.buyin) || c.buyin < 0 || c.buyin > 1000000) return null;
+  if (!Number.isInteger(c.rebuyAmount) || c.rebuyAmount < 0 || c.rebuyAmount > 1000000) return null;
+  if (!Number.isInteger(c.maxRebuys) || c.maxRebuys < 0 || c.maxRebuys > 99) return null;
+  if (!Number.isInteger(c.rebuyWindow) || c.rebuyWindow < 1 || c.rebuyWindow > 999) return null;
+  if (!Array.isArray(c.payout) || c.payout.length !== 3) return null;
+  const payout = c.payout.map(p => (typeof p === 'number' && isFinite(p)) ? Math.floor(p) : -1);
+  if (payout.some(p => p < 0 || p > 100) || payout.reduce((a, b) => a + b, 0) !== 100) return null;
+  if (!Array.isArray(c.chips)) return null;
+  const storedChips = {};
+  for (const ch of c.chips) { if (ch && typeof ch === 'object') storedChips[ch.id] = ch; }
+  // chip identity (css, label, lightText) always comes from the code whitelist, never from storage
+  const bounded = (v, dflt) => (Number.isInteger(v) && v >= 0 && v <= 1000000 ? v : dflt);
+  s.config = {
+    buyin: c.buyin, rebuyAmount: c.rebuyAmount, maxRebuys: c.maxRebuys, rebuyWindow: c.rebuyWindow, payout,
+    chips: CHIP_COLORS.map(def => ({
+      id: def.id, label: def.label, css: def.css, lightText: def.lightText,
+      count: bounded(storedChips[def.id] && storedChips[def.id].count, def.defaultCount),
+      value: bounded(storedChips[def.id] && storedChips[def.id].value, def.defaultValue),
+      start: bounded(storedChips[def.id] && storedChips[def.id].start, def.defaultStart),
+      rebuy: bounded(storedChips[def.id] && storedChips[def.id].rebuy, def.defaultRebuy),
+    })),
+  };
+  if (!Number.isInteger(saved.totalRebuys) || saved.totalRebuys < 0 || saved.totalRebuys > 999) return null;
+  s.totalRebuys = saved.totalRebuys;
+  const n = s.players.length;
+  const so = saved.seatOrder;
+  if (Array.isArray(so) && so.length === n && so.every(i => Number.isInteger(i) && i >= 0 && i < n)
+      && new Set(so).size === n) {
+    s.seatOrder = so.slice();
+  } else {
+    s.seatOrder = s.players.map((_, i) => i);
+  }
+  s.dealerSeat = Number.isInteger(saved.dealerSeat) && saved.dealerSeat >= 0 && saved.dealerSeat < n ? saved.dealerSeat : 0;
+  s.direction = saved.direction === 'anticlockwise' ? 'anticlockwise' : 'clockwise';
+  if (typeof saved.lastTick !== 'number' || !isFinite(saved.lastTick)) return null;
+  s.lastTick = saved.lastTick;
+  return s;
 }
 
 function clearSavedState() {
   localStorage.removeItem(STORAGE_KEY);
+}
+
+function showStorageWarning(msg) {
+  const el = $('storage-warning');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.remove('hidden');
 }
 
 function reconcileTime(s) {
@@ -1244,6 +1335,7 @@ function stopTimer() {
   if (tickInterval) { clearInterval(tickInterval); tickInterval = null; }
 }
 
+let ticksSinceSave = 0;
 function tick() {
   if (!state || state.phase !== 'running') return;
   const now = Date.now();
@@ -1264,7 +1356,7 @@ function tick() {
     saveState();
   }
   renderTournament();
-  if (Date.now() % 30000 < 300) saveState();
+  if (++ticksSinceSave >= 120) { ticksSinceSave = 0; saveState(); }
 }
 
 function togglePause() {
@@ -1544,8 +1636,16 @@ function closeSchedule() {
 
 /* ── Resume ── */
 function checkResume() {
+  const area = $('resume-area');
+  let raw = null;
+  try { raw = localStorage.getItem(STORAGE_KEY); } catch(e) {}
+  if (!raw) { area.innerHTML = ''; return; }
   const saved = loadSavedState();
-  if (!saved) { $('resume-area').innerHTML = ''; return; }
+  if (!saved) {
+    clearSavedState();
+    area.innerHTML = '<p class="storage-note">Saved game was corrupt and has been cleared.</p>';
+    return;
+  }
   const lvl = BLIND_STRUCTURE[saved.currentLevel];
   const desc = lvl.isBreak ? 'Break' : `Level ${lvl.level} (${lvl.sb}/${lvl.bb})`;
   const activePlayers = saved.players.filter(p => p.active).length;
@@ -1609,6 +1709,19 @@ $('schedule-modal').onclick = (e) => {
   if (e.target === $('schedule-modal')) closeSchedule();
 };
 
+$('storage-warning').onclick = () => $('storage-warning').classList.add('hidden');
+
+window.addEventListener('storage', (e) => {
+  if (e.key === STORAGE_KEY && e.newValue && state) {
+    showStorageWarning('This game was changed in another tab. Close one tab to avoid conflicts.');
+  }
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && state) saveState();
+});
+window.addEventListener('beforeunload', () => { if (state) saveState(); });
+
 document.addEventListener('keydown', (e) => {
   if ($('setup').contains(document.activeElement)) return;
   if (e.code === 'Space' && state) {
@@ -1629,7 +1742,8 @@ if (typeof window !== 'undefined') {
     get state() { return state; },
     set state(s) { state = s; },
     fn: { tick, reconcileTime, validateConfig, renderTournament, renderPrizePool, renderPlayers,
-          eliminatePlayer, rebuyPlayer, checkResume, formatTime, formatChips, getNextActiveSeat, escapeHtml },
+          eliminatePlayer, rebuyPlayer, checkResume, formatTime, formatChips, getNextActiveSeat,
+          escapeHtml, sanitizeState, saveState },
   };
 }
 
