@@ -360,6 +360,33 @@ test('validateConfig rejects negatives and too few players for paid places', () 
   assertEq(poker.fn.validateConfig(cfg5), null, 'zero max rebuys is valid');
 });
 
+/* ── Player interaction guards ── */
+test('last player standing cannot be eliminated', () => {
+  poker.state = baseState();
+  poker.state.players[0].active = false;
+  poker.state.players[2].active = false;
+  poker.fn.eliminatePlayer(1);
+  assert(poker.state.players[1].active, 'guard held');
+  assertEq(alerts.length, 0, 'no win alert fired either');
+});
+test('eliminate button hidden on the last player, shown otherwise', () => {
+  poker.state = baseState();
+  poker.fn.renderPlayers();
+  assert(elements['player-list'].innerHTML.includes('data-action="elim"'), 'three active, button present');
+  assert(!elements['player-list'].innerHTML.includes('onclick='), 'no inline handlers');
+  poker.state.players[1].active = false;
+  poker.state.players[2].active = false;
+  poker.fn.renderPlayers();
+  assert(!elements['player-list'].innerHTML.includes('data-action="elim"'), 'one active, button gone');
+});
+test('eliminated dealer still names the seat', () => {
+  poker.state = baseState();
+  poker.state.dealerSeat = 1;
+  poker.state.players[1].active = false;
+  poker.fn.renderPlayers();
+  assert(/\(eliminated\)/.test(elements['dealer-name'].textContent), 'dealer line marks the seat, got: ' + elements['dealer-name'].textContent);
+});
+
 /* ── Win alert (async via setTimeout) ── */
 (async () => {
   await new Promise(r => setTimeout(r, 50));

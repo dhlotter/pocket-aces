@@ -1517,14 +1517,15 @@ function renderPlayers() {
 
     let actions = '';
     if (p.active) {
+      // the eliminate button vanishes on the last player standing
       actions = `
-        <button class="action-icon" onclick="movePlayerUp(${seatIdx})" title="Move up">\u25B2</button>
-        <button class="action-icon" onclick="movePlayerDown(${seatIdx})" title="Move down">\u25BC</button>
-        <button class="action-icon elim-btn" onclick="eliminatePlayer(${playerIdx})" title="Eliminate">\u2715</button>
+        <button class="action-icon" data-action="up" data-seat="${seatIdx}" title="Move up">\u25B2</button>
+        <button class="action-icon" data-action="down" data-seat="${seatIdx}" title="Move down">\u25BC</button>
+        ${activePlayers > 1 ? `<button class="action-icon elim-btn" data-action="elim" data-player="${playerIdx}" title="Eliminate">\u2715</button>` : ''}
       `;
     } else {
       if (canRebuy) {
-        actions = `<button class="action-icon rebuy-btn" onclick="rebuyPlayer(${playerIdx})" title="Re-buy">Re-buy</button>`;
+        actions = `<button class="action-icon rebuy-btn" data-action="rebuy" data-player="${playerIdx}" title="Re-buy">Re-buy</button>`;
       }
     }
 
@@ -1538,7 +1539,9 @@ function renderPlayers() {
   }).join('');
 
   const dlrPlayer = state.players[state.seatOrder[state.dealerSeat]];
-  $('dealer-name').textContent = dlrPlayer.active ? `Dealer: ${dlrPlayer.name}` : '';
+  $('dealer-name').textContent = dlrPlayer.active
+    ? `Dealer: ${dlrPlayer.name}`
+    : `Dealer: ${dlrPlayer.name} (eliminated)`;
 }
 
 function renderPrizePool() {
@@ -1594,6 +1597,7 @@ function movePlayerDown(seatIdx) {
 }
 
 function eliminatePlayer(idx) {
+  if (state.players.filter(p => p.active).length <= 1) return;
   state.players[idx].active = false;
   saveState();
   renderTournament();
@@ -1711,6 +1715,17 @@ $('sub-time-btn').onclick = () => {
 $('dir-cw').onclick = () => setDirection('clockwise');
 $('dir-ccw').onclick = () => setDirection('anticlockwise');
 
+// player list re-renders on every tick, so actions live on the container
+$('player-list').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-action]');
+  if (!btn || !state) return;
+  const action = btn.dataset.action;
+  if (action === 'elim') eliminatePlayer(parseInt(btn.dataset.player, 10));
+  else if (action === 'rebuy') rebuyPlayer(parseInt(btn.dataset.player, 10));
+  else if (action === 'up') movePlayerUp(parseInt(btn.dataset.seat, 10));
+  else if (action === 'down') movePlayerDown(parseInt(btn.dataset.seat, 10));
+});
+
 $('dealer-name').onclick = (e) => {
   e.stopPropagation();
   if (!state) return;
@@ -1738,6 +1753,8 @@ window.addEventListener('beforeunload', () => { if (state) saveState(); });
 
 document.addEventListener('keydown', (e) => {
   if ($('setup').contains(document.activeElement)) return;
+  if (!$('schedule-modal').classList.contains('hidden')) return;
+  if (!$('pause-overlay').classList.contains('hidden')) return;
   if (e.code === 'Space' && state) {
     e.preventDefault();
     togglePause();
