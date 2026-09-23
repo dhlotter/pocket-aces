@@ -1138,13 +1138,19 @@ function updateStackTotals() {
   $('stack-totals').textContent = `Starting stack: ${startTotal.toLocaleString()} \u00B7 Re-buy stack: ${rebuyTotal.toLocaleString()}`;
 }
 
+/* Parses an integer field. Zero is a value, empty or junk falls back. */
+function parseIntField(el, fallback) {
+  const n = parseInt(el.value, 10);
+  return Number.isNaN(n) ? fallback : n;
+}
+
 function readConfig() {
   const chips = CHIP_COLORS.map(c => ({
     id: c.id, label: c.label, css: c.css, lightText: c.lightText,
-    count: parseInt($(`chip-count-${c.id}`).value) || 0,
-    value: parseInt($(`chip-value-${c.id}`).value) || 0,
-    start: parseInt($(`chip-start-${c.id}`).value) || 0,
-    rebuy: parseInt($(`chip-rebuy-${c.id}`).value) || 0,
+    count: parseIntField($(`chip-count-${c.id}`), 0),
+    value: parseIntField($(`chip-value-${c.id}`), 0),
+    start: parseIntField($(`chip-start-${c.id}`), 0),
+    rebuy: parseIntField($(`chip-rebuy-${c.id}`), 0),
   }));
   const playerEls = $('player-inputs').querySelectorAll('input');
   const players = Array.from(playerEls)
@@ -1152,22 +1158,30 @@ function readConfig() {
 
   return {
     chips, players,
-    buyin: parseInt($('cfg-buyin').value) || 300,
-    rebuyAmount: parseInt($('cfg-rebuy').value) || 150,
-    maxRebuys: parseInt($('cfg-max-rebuys').value) || 1,
-    rebuyWindow: parseInt($('cfg-rebuy-window').value) || 4,
+    buyin: parseIntField($('cfg-buyin'), 300),
+    rebuyAmount: parseIntField($('cfg-rebuy'), 150),
+    maxRebuys: parseIntField($('cfg-max-rebuys'), 1),
+    rebuyWindow: parseIntField($('cfg-rebuy-window'), 4),
     payout: [
-      parseInt($('cfg-payout-1').value) ?? 60,
-      parseInt($('cfg-payout-2').value) ?? 30,
-      parseInt($('cfg-payout-3').value) ?? 10,
+      parseIntField($('cfg-payout-1'), 60),
+      parseIntField($('cfg-payout-2'), 30),
+      parseIntField($('cfg-payout-3'), 10),
     ],
   };
 }
 
 function validateConfig(cfg) {
   if (cfg.players.length < 2) return 'Need at least 2 players';
+  const numbers = [
+    cfg.buyin, cfg.rebuyAmount, cfg.maxRebuys, cfg.rebuyWindow, ...cfg.payout,
+    ...cfg.chips.flatMap(c => [c.count, c.value, c.start, c.rebuy]),
+  ];
+  if (numbers.some(n => !Number.isInteger(n) || n < 0)) return 'All values must be whole numbers, zero or more';
+  if (cfg.payout.some(p => p > 100)) return 'Each payout place must be 100% or less';
   const payoutSum = cfg.payout.reduce((a,b) => a+b, 0);
   if (payoutSum !== 100) return `Payout must total 100% (currently ${payoutSum}%)`;
+  const paidPlaces = cfg.payout.filter(p => p > 0).length;
+  if (cfg.players.length < paidPlaces) return `${paidPlaces} prize places pay out, need at least ${paidPlaces} players`;
   const numPlayers = cfg.players.length;
   for (const c of cfg.chips) {
     const needed = c.start * numPlayers;
@@ -1743,7 +1757,7 @@ if (typeof window !== 'undefined') {
     set state(s) { state = s; },
     fn: { tick, reconcileTime, validateConfig, renderTournament, renderPrizePool, renderPlayers,
           eliminatePlayer, rebuyPlayer, checkResume, formatTime, formatChips, getNextActiveSeat,
-          escapeHtml, sanitizeState, saveState },
+          escapeHtml, sanitizeState, saveState, parseIntField, readConfig },
   };
 }
 

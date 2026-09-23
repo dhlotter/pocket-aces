@@ -312,6 +312,54 @@ test('save failure surfaces a warning', () => {
   assert(/Could not save/.test(elements['storage-warning'].textContent), 'warning explains');
 });
 
+/* ── Config parsing and validation hardening ── */
+test('parseIntField keeps zero, defaults on empty or junk', () => {
+  const p = poker.fn.parseIntField;
+  assertEq(p({ value: '0' }, 5), 0, 'zero is a value');
+  assertEq(p({ value: '' }, 5), 5, 'empty falls back');
+  assertEq(p({ value: 'abc' }, 5), 5, 'junk falls back');
+  assertEq(p({ value: ' 12 ' }, 5), 12);
+  assertEq(p({ value: '-3' }, 5), -3, 'sign preserved for validation to catch');
+});
+test('readConfig falls back per field and keeps zeros', () => {
+  const byId = id => document.getElementById(id);
+  byId('cfg-buyin').value = '';
+  byId('cfg-rebuy').value = '';
+  byId('cfg-max-rebuys').value = '0';
+  byId('cfg-rebuy-window').value = '8';
+  byId('cfg-payout-1').value = '60';
+  byId('cfg-payout-2').value = '30';
+  byId('cfg-payout-3').value = '10';
+  const cfg = poker.fn.readConfig();
+  assertEq(cfg.buyin, 300, 'empty buyin defaults');
+  assertEq(cfg.rebuyAmount, 150, 'empty rebuy defaults');
+  assertEq(cfg.maxRebuys, 0, 'zero max rebuys stays zero');
+  assertEq(cfg.rebuyWindow, 8);
+  assertEq(cfg.payout.join(','), '60,30,10', 'no NaN leaks into payout');
+});
+test('validateConfig rejects negatives and too few players for paid places', () => {
+  const good = () => {
+    const s = baseState();
+    s.config.players = s.players;
+    return s.config;
+  };
+  const cfg1 = good();
+  cfg1.buyin = -300;
+  assert(/whole numbers/.test(poker.fn.validateConfig(cfg1)), 'negative buyin');
+  const cfg2 = good();
+  cfg2.payout = [60, 60, -20];
+  assert(/whole numbers/.test(poker.fn.validateConfig(cfg2)), 'negative payout place');
+  const cfg3 = good();
+  cfg3.payout = [50, 30, 10];
+  assert(/100%/.test(poker.fn.validateConfig(cfg3)), 'sum 90 still caught');
+  const cfg4 = good();
+  cfg4.players = [{ name: 'A', active: true, rebuys: 0 }, { name: 'B', active: true, rebuys: 0 }];
+  assert(/prize places/.test(poker.fn.validateConfig(cfg4)), '2 players cannot fill 3 paid places');
+  const cfg5 = good();
+  cfg5.maxRebuys = 0;
+  assertEq(poker.fn.validateConfig(cfg5), null, 'zero max rebuys is valid');
+});
+
 /* ── Win alert (async via setTimeout) ── */
 (async () => {
   await new Promise(r => setTimeout(r, 50));
