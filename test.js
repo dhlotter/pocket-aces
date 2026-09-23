@@ -136,15 +136,14 @@ test('formatChips abbreviates thousands', () => {
 /* ── Seat rotation ── */
 test('getNextActiveSeat rotates clockwise and skips eliminated', () => {
   const s = baseState();
-  poker.state = s;
   const next = poker.fn.getNextActiveSeat;
-  assertEq(next(s.dealerSeat), 1, 'all active, clockwise from 0');
+  assertEq(next(s, s.dealerSeat), 1, 'all active, clockwise from 0');
   s.players[1].active = false;
-  assertEq(next(s.dealerSeat), 2, 'eliminated seat skipped');
-  assertEq(next(2), 0, 'wraps to first active');
+  assertEq(next(s, s.dealerSeat), 2, 'eliminated seat skipped');
+  assertEq(next(s, 2), 0, 'wraps to first active');
   s.direction = 'anticlockwise';
   s.players[1].active = true;
-  assertEq(next(s.dealerSeat), 2, 'anticlockwise from 0');
+  assertEq(next(s, s.dealerSeat), 2, 'anticlockwise from 0');
 });
 
 /* ── Config validation ── */
@@ -385,6 +384,52 @@ test('eliminated dealer still names the seat', () => {
   poker.state.players[1].active = false;
   poker.fn.renderPlayers();
   assert(/\(eliminated\)/.test(elements['dealer-name'].textContent), 'dealer line marks the seat, got: ' + elements['dealer-name'].textContent);
+});
+
+/* ── Clock: tick and resume must agree ── */
+test('tick and reconcileTime agree on a big catch up', () => {
+  const elapsed = 1850; // 5 min left on L1, 30m50s away
+  const a = baseState({ phase: 'running', currentLevel: 0, timeRemaining: 300 });
+  a.lastTick = Date.now() - elapsed * 1000 - 500;
+  const rec = poker.fn.reconcileTime(a);
+  const b = baseState({ phase: 'running', currentLevel: 0, timeRemaining: 300 });
+  b.lastTick = Date.now() - elapsed * 1000 - 500;
+  poker.state = b;
+  poker.fn.tick();
+  assertEq(poker.state.currentLevel, rec.currentLevel, 'same level');
+  assertEq(poker.state.timeRemaining, rec.timeRemaining, 'same remaining');
+  assertEq(poker.state.dealerSeat, rec.dealerSeat, 'same dealer');
+  assertEq(poker.state.currentLevel, 2, 'lands on level index 2');
+  assertEq(poker.state.timeRemaining, 250, 'carries the overshoot');
+  assertEq(poker.state.dealerSeat, 2, 'dealer turned twice');
+});
+test('tick ends the tournament when the last level expires', () => {
+  const s = baseState({ phase: 'running', currentLevel: 15, timeRemaining: 100 });
+  s.lastTick = Date.now() - 150 * 1000 - 500;
+  poker.state = s;
+  poker.fn.tick();
+  assertEq(poker.state.phase, 'finished');
+  assertEq(poker.state.timeRemaining, 0);
+});
+test('finished banner names the survivors', () => {
+  const s = baseState({ phase: 'finished' });
+  s.players[0].active = false;
+  poker.state = s;
+  poker.fn.renderTournament();
+  assert(!elements['finished-banner'].classList.contains('hidden'), 'banner visible');
+  assert(/P2, P3/.test(elements['finished-banner'].innerHTML), 'names survivors');
+  const running = baseState();
+  poker.state = running;
+  poker.fn.renderTournament();
+  assert(elements['finished-banner'].classList.contains('hidden'), 'hidden while running');
+});
+test('playingLevelNumber counts only real levels', () => {
+  const f = poker.fn.playingLevelNumber;
+  assertEq(f(0), 1);
+  assertEq(f(3), 4);
+  assertEq(f(4), 4, 'break adds nothing');
+  assertEq(f(5), 5);
+  assertEq(poker.fn.totalPlayingLevels(), 14);
 });
 
 /* ── Win alert (async via setTimeout) ── */

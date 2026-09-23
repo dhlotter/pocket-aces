@@ -591,6 +591,18 @@ body { min-height: 100dvh; overflow-x: hidden; }
 }
 .break-note { font-family: 'DM Sans', sans-serif; font-size: 13px; color: rgba(255,255,255,0.5); letter-spacing: 0; }
 
+.finished-banner {
+  background: rgba(0,0,0,0.25);
+  border: 1px solid var(--gold);
+  border-radius: 8px;
+  padding: 6px 20px;
+  margin: 6px 0;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 24px;
+  letter-spacing: 2px;
+  color: var(--gold-bright);
+}
+
 .time-controls {
   display: flex;
   gap: 12px;
@@ -938,6 +950,7 @@ body { min-height: 100dvh; overflow-x: hidden; }
       <div class="blinds-display" id="blinds-display"></div>
       <div class="timer-display" id="timer-display">00:00</div>
       <div class="break-banner hidden" id="break-banner"><span id="break-text"></span></div>
+      <div class="finished-banner hidden" id="finished-banner"></div>
       <div class="next-level" id="next-level"></div>
       <div class="time-controls">
         <button class="time-btn" id="sub-time-btn">-1 MIN</button>
@@ -1305,12 +1318,9 @@ function reconcileTime(s) {
   if (s.phase !== 'running') return s;
   const elapsed = Math.floor((Date.now() - s.lastTick) / 1000);
   s.timeRemaining -= elapsed;
-  while (s.timeRemaining <= 0 && s.currentLevel < BLIND_STRUCTURE.length - 1) {
-    s.currentLevel++;
-    s.timeRemaining += BLIND_STRUCTURE[s.currentLevel].duration;
-  }
-  if (s.timeRemaining < 0) s.timeRemaining = 0;
   s.lastTick = Date.now();
+  advanceLevels(s);
+  if (s.timeRemaining < 0) s.timeRemaining = 0;
   return s;
 }
 
@@ -1358,12 +1368,9 @@ function tick() {
   state.timeRemaining -= elapsed;
   state.lastTick = now;
   if (state.timeRemaining <= 0) {
-    if (state.currentLevel < BLIND_STRUCTURE.length - 1) {
-      state.currentLevel++;
-      state.timeRemaining = BLIND_STRUCTURE[state.currentLevel].duration;
-      if (!BLIND_STRUCTURE[state.currentLevel].isBreak) advanceDealer();
-      playGong();
-    } else {
+    const crossed = advanceLevels(state);
+    if (crossed > 0) playGong();
+    if (state.timeRemaining <= 0) {
       state.timeRemaining = 0;
       state.phase = 'finished';
     }
@@ -1401,19 +1408,46 @@ function endTournament() {
 }
 
 /* ── Direction & Seat Helpers ── */
-function getNextActiveSeat(fromSeat) {
-  const n = state.seatOrder.length;
-  const step = state.direction === 'clockwise' ? 1 : -1;
+/* Advances levels while the clock is in overrun, carrying leftover seconds into
+   the new level and turning the dealer on every non break level. Both tick and
+   reconcileTime go through here so a backgrounded tab and a reloaded tab land
+   on the same level, time and dealer. Returns how many levels were crossed. */
+function advanceLevels(s) {
+  let crossed = 0;
+  while (s.timeRemaining <= 0 && s.currentLevel < BLIND_STRUCTURE.length - 1) {
+    s.currentLevel++;
+    s.timeRemaining += BLIND_STRUCTURE[s.currentLevel].duration;
+    if (!BLIND_STRUCTURE[s.currentLevel].isBreak) advanceDealerOn(s);
+    crossed++;
+  }
+  return crossed;
+}
+
+function totalPlayingLevels() {
+  return BLIND_STRUCTURE.filter(l => !l.isBreak).length;
+}
+
+function playingLevelNumber(idx) {
+  return BLIND_STRUCTURE.slice(0, idx + 1).filter(l => !l.isBreak).length;
+}
+
+function getNextActiveSeat(s, fromSeat) {
+  const n = s.seatOrder.length;
+  const step = s.direction === 'clockwise' ? 1 : -1;
   for (let i = 1; i < n; i++) {
     const seat = ((fromSeat + step * i) % n + n) % n;
-    if (state.players[state.seatOrder[seat]].active) return seat;
+    if (s.players[s.seatOrder[seat]].active) return seat;
   }
   return -1;
 }
 
+function advanceDealerOn(s) {
+  const next = getNextActiveSeat(s, s.dealerSeat);
+  if (next !== -1) s.dealerSeat = next;
+}
+
 function advanceDealer() {
-  const next = getNextActiveSeat(state.dealerSeat);
-  if (next !== -1) state.dealerSeat = next;
+  advanceDealerOn(state);
 }
 
 function setDirection(dir) {
@@ -1436,9 +1470,8 @@ function renderTournament() {
   if (!state) return;
   const lvl = BLIND_STRUCTURE[state.currentLevel];
   const isBreak = lvl.isBreak;
-  const playingLevels = BLIND_STRUCTURE.filter(l => !l.isBreak);
-  const currentPlayLevel = isBreak ? '\u2014' : lvl.level;
-  const totalPlayLevels = playingLevels.length;
+  const currentPlayLevel = isBreak ? '\u2014' : playingLevelNumber(state.currentLevel);
+  const totalPlayLevels = totalPlayingLevels();
 
   $('level-label').innerHTML = isBreak
     ? 'BREAK'
@@ -1457,6 +1490,13 @@ function renderTournament() {
   timerEl.textContent = formatTime(state.timeRemaining);
   timerEl.classList.toggle('warning', state.timeRemaining <= 60 && state.timeRemaining > 0);
   timerEl.classList.toggle('pulse', state.timeRemaining <= 30 && state.timeRemaining > 0);
+
+  const finished = state.phase === 'finished';
+  $('finished-banner').classList.toggle('hidden', !finished);
+  if (finished) {
+    const remaining = state.players.filter(p => p.active).map(p => escapeHtml(p.name)).join(', ');
+    $('finished-banner').innerHTML = `FINISHED \u00B7 <span class="break-note">${remaining || 'no players left'}</span>`;
+  }
 
   const nextIdx = state.currentLevel + 1;
   if (nextIdx < BLIND_STRUCTURE.length) {
@@ -1493,10 +1533,10 @@ function renderPlayers() {
   $('players-active-count').textContent = `${activePlayers} / ${state.players.length}`;
 
   const n = state.seatOrder.length;
-  const sbSeat = getNextActiveSeat(state.dealerSeat);
-  const bbSeat = sbSeat !== -1 ? getNextActiveSeat(sbSeat) : -1;
+  const sbSeat = getNextActiveSeat(state, state.dealerSeat);
+  const bbSeat = sbSeat !== -1 ? getNextActiveSeat(state, sbSeat) : -1;
 
-  const currentPlayLevel = BLIND_STRUCTURE.slice(0, state.currentLevel + 1).filter(l => !l.isBreak).length;
+  const currentPlayLevel = playingLevelNumber(state.currentLevel);
 
   container.innerHTML = state.seatOrder.map((playerIdx, seatIdx) => {
     const p = state.players[playerIdx];
@@ -1774,7 +1814,8 @@ if (typeof window !== 'undefined') {
     set state(s) { state = s; },
     fn: { tick, reconcileTime, validateConfig, renderTournament, renderPrizePool, renderPlayers,
           eliminatePlayer, rebuyPlayer, checkResume, formatTime, formatChips, getNextActiveSeat,
-          escapeHtml, sanitizeState, saveState, parseIntField, readConfig },
+          escapeHtml, sanitizeState, saveState, parseIntField, readConfig,
+          playingLevelNumber, totalPlayingLevels },
   };
 }
 
