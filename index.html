@@ -10,18 +10,22 @@
 
 :root {
   --bg: #070b07;
-  --surface: #0f180f;
-  --surface-raised: #162116;
+  --surface: #122113;
+  --surface-raised: #1c2c1d;
   --border: #243024;
   --gold: #c9a84c;
-  --gold-dim: #a08544;
+  --gold-dim: #ab8f4a;
   --gold-bright: #ebd26a;
   --green-felt: #1a6b3c;
   --green-dark: #0d3d1d;
+  --felt-hover: #2a8141;
   --text: #e0d8c8;
-  --text-secondary: #948c7d;
+  --text-secondary: #a19a8b;
+  --break-text: #b8b0a0;
   --danger: #c43030;
   --danger-glow: #ff4040;
+  --danger-surface: #3a1515;
+  --danger-text: #ffd7d7;
   --chip-white: #e0e0e0;
   --chip-red: #cc3333;
   --chip-blue: #3366cc;
@@ -237,9 +241,9 @@ body { min-height: 100dvh; overflow-x: clip; }
   left: 50%;
   transform: translateX(-50%);
   z-index: 300;
-  background: #3a1515;
+  background: var(--danger-surface);
   border: 1px solid var(--danger);
-  color: #ffd7d7;
+  color: var(--danger-text);
   font-size: 13px;
   padding: 8px 16px;
   border-radius: 8px;
@@ -555,7 +559,7 @@ body { min-height: 100dvh; overflow-x: clip; }
   font-size: 24px;
 }
 .ctrl-btn.primary:hover {
-  background: #2a8141;
+  background: var(--felt-hover);
 }
 .ctrl-btn.danger {
   border-color: rgba(255,60,60,0.3);
@@ -850,7 +854,7 @@ body { min-height: 100dvh; overflow-x: clip; }
 .sched-blinds { flex: 1; font-weight: 500; }
 .sched-duration { color: var(--text-secondary); font-size: 13px; }
 /* secondary text fails 4.5:1 on the green break rows, so those rows get a lighter shade */
-.is-break .sched-level, .is-break .sched-duration { color: #b8b0a0; }
+.is-break .sched-level, .is-break .sched-duration { color: var(--break-text); }
 
 /* ── Responsive ── */
 @media (max-width: 1400px) {
