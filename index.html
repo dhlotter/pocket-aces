@@ -1609,6 +1609,16 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+/* ── Test hook (inert in the browser, consumed by test.js) ── */
+if (typeof window !== 'undefined') {
+  window.__poker = {
+    get state() { return state; },
+    set state(s) { state = s; },
+    fn: { tick, reconcileTime, validateConfig, renderTournament, renderPrizePool, renderPlayers,
+          eliminatePlayer, rebuyPlayer, checkResume, formatTime, formatChips, getNextActiveSeat },
+  };
+}
+
 /* ── Init ── */
 buildSetupForm();
 checkResume();
