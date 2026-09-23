@@ -29,8 +29,8 @@
   --chip-black: #555;
 }
 
-html { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; }
-body { min-height: 100dvh; overflow-x: hidden; }
+html { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; overflow-x: clip; }
+body { min-height: 100dvh; overflow-x: clip; }
 
 .hidden { display: none !important; }
 
@@ -202,7 +202,7 @@ body { min-height: 100dvh; overflow-x: hidden; }
   font-size: 28px;
   letter-spacing: 3px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: border-color 0.2s ease-out, box-shadow 0.2s ease-out, transform 0.1s ease-out;
 }
 .start-btn:hover { border-color: var(--gold); box-shadow: 0 0 20px rgba(201,168,76,0.2); }
 .start-btn:active { transform: scale(0.98); }
@@ -326,7 +326,7 @@ body { min-height: 100dvh; overflow-x: hidden; }
   font-weight: 500;
   font-family: inherit;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background-color 0.15s ease-out, color 0.15s ease-out, border-color 0.15s ease-out;
 }
 .dir-btn:hover { background: rgba(255,255,255,0.08); }
 .dir-btn.active {
@@ -348,7 +348,7 @@ body { min-height: 100dvh; overflow-x: hidden; }
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  transition: all 0.15s;
+  transition: background-color 0.15s ease-out;
   border-radius: 8px;
 }
 .player-card:hover { background: rgba(255,255,255,0.03); }
@@ -418,7 +418,7 @@ body { min-height: 100dvh; overflow-x: hidden; }
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s;
+  transition: background-color 0.15s ease-out, color 0.15s ease-out;
   padding: 0;
   font-family: inherit;
 }
@@ -543,7 +543,7 @@ body { min-height: 100dvh; overflow-x: hidden; }
   font-size: 20px;
   letter-spacing: 2px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: background-color 0.15s ease-out;
 }
 .ctrl-btn:hover { background: rgba(255,255,255,0.08); }
 .ctrl-btn.primary {
@@ -660,7 +660,7 @@ body { min-height: 100dvh; overflow-x: hidden; }
   font-size: 18px;
   letter-spacing: 1px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: border-color 0.15s ease-out, color 0.15s ease-out;
 }
 .time-btn:hover { border-color: var(--gold-dim); color: var(--gold-bright); }
 
