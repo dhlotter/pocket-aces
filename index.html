@@ -4,8 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Poker Night</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="fonts/fonts.css" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1175,7 +1174,8 @@ function addPlayerInput(name, paid) {
   const paintPaid = () => {
     const isPaid = paidBtn.dataset.paid === '1';
     paidBtn.dataset.paid = isPaid ? '1' : '0';
-    paidBtn.textContent = isPaid ? '\u2713' : '\u2717';
+    // hollow circle owes, tick paid, so the toggle never looks like the remove cross
+    paidBtn.textContent = isPaid ? '\u2713' : '\u25CB';
     paidBtn.classList.toggle('paid-yes', isPaid);
     paidBtn.classList.toggle('paid-no', !isPaid);
   };
