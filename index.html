@@ -569,7 +569,9 @@ body { min-height: 100dvh; overflow-x: hidden; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* safe center: keep the clock centred, fall back to start alignment
+     when the column is too short, so nothing clips off the top */
+  justify-content: safe center;
   text-align: center;
   background: radial-gradient(ellipse at center, #0d2a14 0%, var(--bg) 100%);
   position: relative;
@@ -587,7 +589,8 @@ body { min-height: 100dvh; overflow-x: hidden; }
 
 .blinds-display {
   font-family: 'Bebas Neue', sans-serif;
-  font-size: clamp(50px, 10vw, 120px);
+  /* vh caps keep the clock column clear of the controls on short screens */
+  font-size: clamp(50px, min(10vw, 14vh), 120px);
   letter-spacing: 2px;
   color: #fff;
   line-height: 1.1;
@@ -596,7 +599,7 @@ body { min-height: 100dvh; overflow-x: hidden; }
 
 .timer-display {
   font-family: 'Bebas Neue', sans-serif;
-  font-size: clamp(100px, 22vw, 280px);
+  font-size: clamp(100px, min(22vw, 28vh), 280px);
   line-height: 1;
   color: var(--gold-bright);
   padding: 4px 0;
