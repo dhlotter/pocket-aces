@@ -1049,6 +1049,11 @@ function playGong() {
 
 /* ── Helpers ── */
 function $(id) { return document.getElementById(id); }
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, ch => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+  ));
+}
 function formatTime(seconds) {
   if (seconds < 0) seconds = 0;
   const m = Math.floor(seconds / 60);
@@ -1086,10 +1091,19 @@ function addPlayerInput(name) {
   const inputs = $('player-inputs');
   const row = document.createElement('div');
   row.className = 'player-row';
-  row.innerHTML = `<input type="text" value="${name}" placeholder="Name"><button class="remove-btn" title="Remove">&times;</button>`;
-  row.querySelector('.remove-btn').onclick = () => {
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'Name';
+  input.value = name;
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'remove-btn';
+  removeBtn.title = 'Remove';
+  removeBtn.textContent = '\u00D7';
+  removeBtn.onclick = () => {
     if (inputs.children.length > 2) row.remove();
   };
+  row.appendChild(input);
+  row.appendChild(removeBtn);
   inputs.appendChild(row);
 }
 
@@ -1410,7 +1424,7 @@ function renderPlayers() {
 
     return `<div class="player-card ${p.active ? '' : 'eliminated'}">
       <div class="active-dot"></div>
-      <div class="player-name">${p.name}</div>
+      <div class="player-name">${escapeHtml(p.name)}</div>
       <div class="player-badges">${badges}</div>
       ${rebuyBadge}
       <div class="player-actions">${actions}</div>
@@ -1615,7 +1629,7 @@ if (typeof window !== 'undefined') {
     get state() { return state; },
     set state(s) { state = s; },
     fn: { tick, reconcileTime, validateConfig, renderTournament, renderPrizePool, renderPlayers,
-          eliminatePlayer, rebuyPlayer, checkResume, formatTime, formatChips, getNextActiveSeat },
+          eliminatePlayer, rebuyPlayer, checkResume, formatTime, formatChips, getNextActiveSeat, escapeHtml },
   };
 }
 

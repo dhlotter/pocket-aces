@@ -229,6 +229,24 @@ test('no saved game means no banner', () => {
   assertEq(elements['resume-area'].innerHTML, '');
 });
 
+/* ── XSS hardening ── */
+test('escapeHtml neutralises markup and attribute breakouts', () => {
+  const e = poker.fn.escapeHtml;
+  const payload = '<img src=x onerror="alert(1)">';
+  const out = e(payload);
+  assert(!/[<>"']/.test(out.replace(/&(?:amp|lt|gt|quot|#39);/g, '')), 'no raw specials survive');
+  assert(out === '&lt;img src=x onerror=&quot;alert(1)&quot;&gt;', 'full escape, got: ' + out);
+  assertEq(e('O\'Brien & Sons <b>"x"</b>'), 'O&#39;Brien &amp; Sons &lt;b&gt;&quot;x&quot;&lt;/b&gt;');
+});
+test('renderPlayers renders hostile names inert', () => {
+  poker.state = baseState();
+  poker.state.players[0].name = '<img src=x onerror=window.__pwned=1>';
+  poker.fn.renderPlayers();
+  const html = elements['player-list'].innerHTML;
+  assert(!html.includes('<img'), 'no raw img tag in player list');
+  assert(html.includes('&lt;img'), 'name present but escaped');
+});
+
 /* ── Win alert (async via setTimeout) ── */
 (async () => {
   await new Promise(r => setTimeout(r, 50));
