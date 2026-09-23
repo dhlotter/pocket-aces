@@ -31,6 +31,8 @@ function makeEl(id) {
     },
     addEventListener(type, fn) { (el._handlers[type] = el._handlers[type] || []).push(fn); },
     removeEventListener() {},
+    setAttribute(k, v) { el[k] = v; },
+    getAttribute(k) { return el[k]; },
     appendChild(c) { el.children.push(c); return c; },
     remove() {},
     querySelector() { return makeEl(id + '>' + Math.random()); },

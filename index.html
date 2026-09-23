@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Poker Night</title>
 <link href="fonts/fonts.css" rel="stylesheet">
 <style>
@@ -14,12 +14,12 @@
   --surface-raised: #162116;
   --border: #243024;
   --gold: #c9a84c;
-  --gold-dim: #8a7434;
+  --gold-dim: #a08544;
   --gold-bright: #ebd26a;
   --green-felt: #1a6b3c;
   --green-dark: #0d3d1d;
   --text: #e0d8c8;
-  --text-secondary: #8a8274;
+  --text-secondary: #948c7d;
   --danger: #c43030;
   --danger-glow: #ff4040;
   --chip-white: #e0e0e0;
@@ -841,6 +841,8 @@ body { min-height: 100dvh; overflow-x: hidden; }
 }
 .sched-blinds { flex: 1; font-weight: 500; }
 .sched-duration { color: var(--text-secondary); font-size: 13px; }
+/* secondary text fails 4.5:1 on the green break rows, so those rows get a lighter shade */
+.is-break .sched-level, .is-break .sched-duration { color: #b8b0a0; }
 
 /* ── Responsive ── */
 @media (max-width: 1400px) {
@@ -898,21 +900,21 @@ body { min-height: 100dvh; overflow-x: hidden; }
       <div class="section-title">Tournament</div>
       <div class="form-row">
         <div class="form-group">
-          <label>Buy-in (R)</label>
+          <label for="cfg-buyin">Buy-in (R)</label>
           <input type="number" id="cfg-buyin" value="300">
         </div>
         <div class="form-group">
-          <label>Re-buy (R)</label>
+          <label for="cfg-rebuy">Re-buy (R)</label>
           <input type="number" id="cfg-rebuy" value="150">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>Max re-buys</label>
+          <label for="cfg-max-rebuys">Max re-buys</label>
           <input type="number" id="cfg-max-rebuys" value="1" min="0" max="5">
         </div>
         <div class="form-group">
-          <label>Re-buy window</label>
+          <label for="cfg-rebuy-window">Re-buy window</label>
           <select id="cfg-rebuy-window">
             <option value="4" selected>First 4 levels</option>
             <option value="6">First 6 levels</option>
@@ -926,18 +928,18 @@ body { min-height: 100dvh; overflow-x: hidden; }
     <div class="section">
       <div class="section-title">Payout</div>
       <div class="payout-row">
-        <span>&#x1F947;</span>
-        <div class="form-group"><input type="number" id="cfg-payout-1" value="60" min="0" max="100"></div>
+        <span aria-hidden="true">&#x1F947;</span>
+        <div class="form-group"><input type="number" id="cfg-payout-1" aria-label="First place payout percent" value="60" min="0" max="100"></div>
         <div class="payout-label">%</div>
       </div>
       <div class="payout-row">
-        <span>&#x1F948;</span>
-        <div class="form-group"><input type="number" id="cfg-payout-2" value="30" min="0" max="100"></div>
+        <span aria-hidden="true">&#x1F948;</span>
+        <div class="form-group"><input type="number" id="cfg-payout-2" aria-label="Second place payout percent" value="30" min="0" max="100"></div>
         <div class="payout-label">%</div>
       </div>
       <div class="payout-row">
-        <span>&#x1F949;</span>
-        <div class="form-group"><input type="number" id="cfg-payout-3" value="10" min="0" max="100"></div>
+        <span aria-hidden="true">&#x1F949;</span>
+        <div class="form-group"><input type="number" id="cfg-payout-3" aria-label="Third place payout percent" value="10" min="0" max="100"></div>
         <div class="payout-label">%</div>
       </div>
     </div>
@@ -956,7 +958,7 @@ body { min-height: 100dvh; overflow-x: hidden; }
 <div id="tournament" class="hidden">
   <div class="tournament-grid">
     <!-- Column 1: Chips, Prize Pool, Controls -->
-    <div class="t-col t-col-info">
+    <div class="t-col t-col-info" tabindex="0" role="region" aria-label="Chips and prize pool">
       <div class="info-scrollable">
         <div class="panel">
           <div class="panel-title">Chips</div>
@@ -1005,7 +1007,7 @@ body { min-height: 100dvh; overflow-x: hidden; }
     </div>
 
     <!-- Column 4: Hand Rankings -->
-    <div class="t-col t-col-rankings">
+    <div class="t-col t-col-rankings" tabindex="0" role="region" aria-label="Hand rankings">
       <div class="panel-title">Hand Rankings</div>
       <div class="hand-rankings" id="hand-rankings"></div>
     </div>
@@ -1027,7 +1029,7 @@ body { min-height: 100dvh; overflow-x: hidden; }
     <h2>Blind Schedule</h2>
     <button class="modal-close" id="schedule-close">&times;</button>
   </div>
-  <div class="modal-body" id="schedule-body"></div>
+  <div class="modal-body" id="schedule-body" tabindex="0" role="region" aria-label="Blind schedule"></div>
 </div>
 
 <script>
@@ -1035,7 +1037,7 @@ const CHIP_COLORS = [
   { id: 'white', label: 'White', css: 'var(--chip-white)', lightText: false, defaultCount: 100, defaultValue: 25, defaultStart: 8, defaultRebuy: 4 },
   { id: 'red', label: 'Red', css: 'var(--chip-red)', lightText: true, defaultCount: 50, defaultValue: 50, defaultStart: 6, defaultRebuy: 2 },
   { id: 'blue', label: 'Blue', css: 'var(--chip-blue)', lightText: true, defaultCount: 50, defaultValue: 100, defaultStart: 5, defaultRebuy: 3 },
-  { id: 'green', label: 'Green', css: 'var(--chip-green)', lightText: true, defaultCount: 50, defaultValue: 500, defaultStart: 4, defaultRebuy: 2 },
+  { id: 'green', label: 'Green', css: 'var(--chip-green)', lightText: false, defaultCount: 50, defaultValue: 500, defaultStart: 4, defaultRebuy: 2 },
   { id: 'black', label: 'Black', css: 'var(--chip-black)', lightText: true, defaultCount: 50, defaultValue: 1000, defaultStart: 2, defaultRebuy: 1 },
 ];
 
@@ -1142,10 +1144,10 @@ function buildSetupForm() {
   tbody.innerHTML = CHIP_COLORS.map(c => `
     <tr>
       <td><span class="chip-dot" style="background:${c.css}"></span><span class="chip-label">${c.label}</span></td>
-      <td><input type="number" id="chip-count-${c.id}" value="${c.defaultCount}" min="0"></td>
-      <td><input type="number" id="chip-value-${c.id}" value="${c.defaultValue}" min="1"></td>
-      <td><input type="number" id="chip-start-${c.id}" value="${c.defaultStart}" min="0"></td>
-      <td><input type="number" id="chip-rebuy-${c.id}" value="${c.defaultRebuy}" min="0"></td>
+      <td><input type="number" id="chip-count-${c.id}" aria-label="${c.label} chips in stock" value="${c.defaultCount}" min="0"></td>
+      <td><input type="number" id="chip-value-${c.id}" aria-label="${c.label} chip value" value="${c.defaultValue}" min="1"></td>
+      <td><input type="number" id="chip-start-${c.id}" aria-label="${c.label} chips per starting stack" value="${c.defaultStart}" min="0"></td>
+      <td><input type="number" id="chip-rebuy-${c.id}" aria-label="${c.label} chips per re-buy stack" value="${c.defaultRebuy}" min="0"></td>
     </tr>
   `).join('');
   tbody.addEventListener('input', updateStackTotals);
@@ -1166,6 +1168,7 @@ function addPlayerInput(name, paid) {
   input.type = 'text';
   input.placeholder = 'Name';
   input.value = name;
+  input.setAttribute('aria-label', 'Player name');
   // buy-in ledger toggle: green tick once the cash has landed
   const paidBtn = document.createElement('button');
   paidBtn.type = 'button';
